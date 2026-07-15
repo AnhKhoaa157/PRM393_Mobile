@@ -1,0 +1,18 @@
+# Flutter and Dart build artifacts
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.env
+build/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Platform-specific generated files
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
