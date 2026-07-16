@@ -14,8 +14,15 @@ flutter run
 ```
 
 Use a LAN address instead for a physical device, for example
-`http://192.168.1.10:5000/api`. `--dart-define=API_BASE=...` remains available
-and overrides `.env` for CI or a one-off build.
+`http://192.168.1.10:5000/api`; do not use `localhost` on a physical device.
+When running Flutter Web locally, the same emulator address is automatically
+mapped to `localhost`.
+The Android manifest explicitly allows local HTTP development traffic. Deploy
+the backend behind HTTPS before publishing a production build.
+
+The backend currently chooses the next available port when `PORT=5000` is
+occupied. Check its startup log and keep `API_BASE` on that exact port; the
+mobile app cannot discover a port chosen dynamically.
 
 The Flutter SDK available on this machine currently has a stale SDK lock, so its
 platform scaffolding could not be generated here. Once the SDK lock is released,

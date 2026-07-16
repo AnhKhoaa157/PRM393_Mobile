@@ -9,6 +9,7 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   List<Map<String, dynamic>> history = [];
+  Set<String> reviewedSessionIds = <String>{};
   bool loading = true;
   @override
   void initState() {
@@ -19,13 +20,154 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> load() async {
     setState(() => loading = true);
     try {
-      final r = await widget.session.api
+      final historyResponse = await widget.session.api
           .request('/users/parking-history', token: widget.session.token);
-      if (mounted) setState(() => history = _items(r));
+      dynamic feedbackResponse;
+      try {
+        feedbackResponse = await widget.session.api
+            .request('/users/feedbacks/me', token: widget.session.token);
+      } catch (_) {
+        // Keep parking history usable if feedback support is unavailable.
+      }
+      final feedbacks = feedbackResponse == null
+          ? <Map<String, dynamic>>[]
+          : _items(feedbackResponse);
+      if (mounted) {
+        setState(() {
+          history = _items(historyResponse);
+          reviewedSessionIds = feedbacks
+              .map((feedback) {
+                final session = feedback['parkingSession'];
+                return session is Map
+                    ? (session['_id'] ?? '').toString()
+                    : (session ?? '').toString();
+              })
+              .where((id) => id.isNotEmpty)
+              .toSet();
+        });
+      }
     } catch (e) {
       if (mounted) _snack(e);
     }
     if (mounted) setState(() => loading = false);
+  }
+
+  bool _canRate(Map<String, dynamic> session) {
+    final id = session['_id']?.toString() ?? '';
+    return session['status'] == 'completed' &&
+        id.isNotEmpty &&
+        !reviewedSessionIds.contains(id);
+  }
+
+  Future<void> _showFeedback(Map<String, dynamic> session) async {
+    final sessionId = session['_id']?.toString();
+    if (sessionId == null || sessionId.isEmpty) return;
+
+    var rating = 0;
+    var submitting = false;
+    String? error;
+    final comment = TextEditingController();
+    final submitted = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => Padding(
+            padding: EdgeInsets.fromLTRB(
+                20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+            child: StatefulBuilder(builder: (context, setSheetState) {
+              Future<void> submit() async {
+                final trimmedComment = comment.text.trim();
+                if (rating == 0 || trimmedComment.isEmpty) {
+                  setSheetState(() {
+                    error = 'Choose a rating and enter your feedback.';
+                  });
+                  return;
+                }
+                setSheetState(() {
+                  submitting = true;
+                  error = null;
+                });
+                try {
+                  await widget.session.api.request('/users/feedbacks',
+                      method: 'POST',
+                      token: widget.session.token,
+                      body: {
+                        'parkingSession': sessionId,
+                        'rating': rating,
+                        'comment': trimmedComment,
+                        if (session['building'] is Map)
+                          'building': session['building']['_id'],
+                      });
+                  if (context.mounted) Navigator.pop(context, true);
+                } catch (e) {
+                  setSheetState(() => error = e.toString());
+                } finally {
+                  if (context.mounted) setSheetState(() => submitting = false);
+                }
+              }
+
+              return Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('Rate your parking experience',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text('${session['plateNumber'] ?? 'Parking session'}',
+                    style: const TextStyle(color: _muted)),
+                const SizedBox(height: 18),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                        5,
+                        (index) => IconButton(
+                            onPressed: submitting
+                                ? null
+                                : () => setSheetState(() => rating = index + 1),
+                            iconSize: 36,
+                            color: Colors.amber.shade700,
+                            icon: Icon(index < rating
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded)))),
+                TextField(
+                    controller: comment,
+                    enabled: !submitting,
+                    maxLength: 150,
+                    minLines: 3,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                        labelText: 'Your feedback',
+                        hintText: 'Tell us about your parking experience')),
+                if (error != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(error!,
+                          style: const TextStyle(color: Colors.red))),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                      child: OutlinedButton(
+                          onPressed: submitting
+                              ? null
+                              : () => Navigator.pop(context),
+                          child: const Text('Later'))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: FilledButton(
+                          onPressed: submitting ? null : submit,
+                          child: submitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Text('Submit review')))
+                ])
+              ]);
+            })));
+    comment.dispose();
+    if (submitted == true) {
+      await load();
+      if (mounted) _snack('Thank you for your feedback.');
+    }
   }
 
   @override
@@ -49,9 +191,15 @@ class _HistoryPageState extends State<HistoryPage> {
                     subtitle: Text(
                         '${h['building'] is Map ? h['building']['name'] ?? '' : ''}\n${_date(h['entryTime'] ?? h['check_in'] ?? h['checkIn'])} → ${_date(h['exitTime'] ?? h['check_out'] ?? h['checkOut'])}'),
                     isThreeLine: true,
-                    trailing: h['fee'] == null
-                        ? null
-                        : Text('${_money(_asNum(h['fee']))} VND'),
+                    onTap: _canRate(h) ? () => _showFeedback(h) : null,
+                    trailing: _canRate(h)
+                        ? IconButton(
+                            tooltip: 'Rate parking',
+                            onPressed: () => _showFeedback(h),
+                            icon: const Icon(Icons.star_outline))
+                        : h['fee'] == null
+                            ? null
+                            : Text('${_money(_asNum(h['fee']))} VND'),
                   ))),
             ])),
       );
@@ -123,6 +271,7 @@ class _WalletPageState extends State<WalletPage> {
           token: widget.session.token,
           body: {'amount': amount.round()});
       final data = _data(r);
+      final orderCode = data['orderCode']?.toString();
       if (!mounted) return;
       final checkoutUrl = Uri.tryParse('${data['checkoutUrl'] ?? ''}');
       if (checkoutUrl != null && await canLaunchUrl(checkoutUrl)) {
@@ -136,9 +285,36 @@ class _WalletPageState extends State<WalletPage> {
                       'Amount: ${_money(amount)} VND\n\nOpen this payment URL in your browser:\n${data['checkoutUrl'] ?? 'Payment link unavailable'}'),
                   actions: [
                     TextButton(
+                        onPressed: orderCode == null
+                            ? null
+                            : () async {
+                                await _verifyTopUp(orderCode);
+                                if (mounted) Navigator.pop(context);
+                              },
+                        child: const Text('I completed payment')),
+                    TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Close'))
                   ]));
+    } catch (e) {
+      if (mounted) _snack(e);
+    }
+  }
+
+  Future<void> _verifyTopUp(String orderCode) async {
+    try {
+      final result = await widget.session.api.request(
+          '/users/wallet/topup/$orderCode/status',
+          token: widget.session.token);
+      final data = _data(result);
+      await load();
+      if (mounted) {
+        final status = data['status']?.toString() ?? 'pending';
+        final credited = data['credited'] == true;
+        _snack(credited
+            ? 'Payment verified. Your wallet has been credited.'
+            : 'Payment status: $status. Your balance will update when payment is confirmed.');
+      }
     } catch (e) {
       if (mounted) _snack(e);
     }

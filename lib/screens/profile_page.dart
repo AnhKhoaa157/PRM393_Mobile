@@ -68,6 +68,18 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _setDefaultPlate(Plate p) async {
+    if (p.isDefault) return;
+    try {
+      await widget.session.api.request('/users/license-plates/${p.id}/default',
+          method: 'PATCH', token: widget.session.token);
+      await widget.session.reloadProfile();
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) _snack(e);
+    }
+  }
+
   Future<void> _editProfile() async {
     final name = TextEditingController(text: widget.session.user!.name);
     final phone = TextEditingController(text: widget.session.user!.phone);
@@ -166,8 +178,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   title: Text(u.name,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Text(
-                      '${u.email}\n${u.phone.isEmpty ? 'No phone number' : u.phone}'),
+                   subtitle: Text(
+                      "${u.email}\n${u.phone.isEmpty ? 'No phone number' : u.phone}"),
                   isThreeLine: true,
                   trailing: IconButton(
                       onPressed: _editProfile,
@@ -193,12 +205,23 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Icon(Icons.directions_car_outlined)),
                   title: Text(p.number,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle:
+                      Text(p.isDefault ? "${p.type} • Default" : p.type),
+                  /* legacy text with invalid nested quotes:
                   subtitle: Text(
                       '${p.type}${p.isDefault ? ' ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Default' : ''}'),
-                  trailing: IconButton(
-                      onPressed: () => _removePlate(p),
-                      icon: const Icon(Icons.delete_outline),
-                      color: Colors.red)))),
+                  */
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                     if (!p.isDefault)
+                       IconButton(
+                           tooltip: 'Set as default',
+                           onPressed: () => _setDefaultPlate(p),
+                           icon: const Icon(Icons.star_outline)),
+                     IconButton(
+                         onPressed: () => _removePlate(p),
+                         icon: const Icon(Icons.delete_outline),
+                         color: Colors.red)
+                    ])))),
           const SizedBox(height: 18),
           const Text('Security',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),

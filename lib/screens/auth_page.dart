@@ -161,7 +161,6 @@ class _AuthPageState extends State<AuthPage> {
           .request('/users/auth/forgot-password', method: 'POST', body: {
         'email': email.text.trim(),
         'clientType': 'mobile',
-        'frontendUrl': 'parkingmobile://reset-password'
       });
       if (mounted) _message('Reset instructions have been sent.');
     } catch (e) {

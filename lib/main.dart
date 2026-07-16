@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,7 +15,6 @@ part 'models/user.dart';
 part 'screens/auth_page.dart';
 part 'widgets/shell.dart';
 part 'screens/home_page.dart';
-part 'screens/reservations_page.dart';
 part 'screens/history_wallet_page.dart';
 part 'screens/packages_page.dart';
 part 'screens/profile_page.dart';

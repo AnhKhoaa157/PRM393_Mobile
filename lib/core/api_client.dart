@@ -8,13 +8,38 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// REST adapter for the existing Node backend. Set API_BASE at build/run time.
+/// REST adapter for the existing Node backend. API_BASE is read from `.env`.
 class ApiClient {
+  /// `localhost` on Android refers to the emulator itself, not the development
+  /// machine.  Android emulators expose the host at 10.0.2.2.
   String get baseUrl {
-    const definedUrl = String.fromEnvironment('API_BASE');
-    return definedUrl.isNotEmpty
-        ? definedUrl
-        : dotenv.env['API_BASE'] ?? 'http://10.0.2.2:5000/api';
+    final configuredUrl = dotenv.env['API_BASE']?.trim();
+    if (configuredUrl == null || configuredUrl.isEmpty) {
+      throw ApiException('Missing API_BASE in .env.');
+    }
+    return _normaliseBaseUrl(configuredUrl);
+  }
+
+  String _normaliseBaseUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return value.replaceFirst(RegExp(r'/$'), '');
+
+    if (kIsWeb && uri.host == '10.0.2.2') {
+      return uri
+          .replace(host: 'localhost')
+          .toString()
+          .replaceFirst(RegExp(r'/$'), '');
+    }
+
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        (uri.host == 'localhost' || uri.host == '127.0.0.1')) {
+      return uri
+          .replace(host: '10.0.2.2')
+          .toString()
+          .replaceFirst(RegExp(r'/$'), '');
+    }
+    return value.replaceFirst(RegExp(r'/$'), '');
   }
 
   Future<dynamic> request(
@@ -23,27 +48,54 @@ class ApiClient {
     String? token,
     Map<String, dynamic>? body,
   }) async {
-    final client = HttpClient();
     try {
       final uri = Uri.parse('$baseUrl$path');
-      final request = await client
-          .openUrl(method, uri)
-          .timeout(const Duration(seconds: 20));
-      request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
       if (token != null && token.isNotEmpty) {
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+        headers['Authorization'] = 'Bearer $token';
       }
-      if (body != null) request.write(jsonEncode(body));
-      final response =
-          await request.close().timeout(const Duration(seconds: 20));
-      final text = await response.transform(utf8.decoder).join();
+
+      http.Response response;
+      final requestBody = body != null ? jsonEncode(body) : null;
+
+      switch (method.toUpperCase()) {
+        case 'POST':
+          response = await http
+              .post(uri, headers: headers, body: requestBody)
+              .timeout(const Duration(seconds: 20));
+          break;
+        case 'PUT':
+          response = await http
+              .put(uri, headers: headers, body: requestBody)
+              .timeout(const Duration(seconds: 20));
+          break;
+        case 'DELETE':
+          response = await http
+              .delete(uri, headers: headers, body: requestBody)
+              .timeout(const Duration(seconds: 20));
+          break;
+        case 'PATCH':
+          response = await http
+              .patch(uri, headers: headers, body: requestBody)
+              .timeout(const Duration(seconds: 20));
+          break;
+        default:
+          response = await http
+              .get(uri, headers: headers)
+              .timeout(const Duration(seconds: 20));
+      }
+
+      final text = response.body;
       dynamic payload;
       try {
         payload = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
       } on FormatException {
         payload = <String, dynamic>{};
       }
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final message = payload is Map && payload['message'] != null
             ? payload['message'].toString()
@@ -51,13 +103,12 @@ class ApiClient {
         throw ApiException(message, response.statusCode);
       }
       return payload;
-    } on SocketException {
-      throw ApiException(
-          'Cannot connect to the parking server. Check API_BASE.');
+    } on ApiException catch (e) {
+      rethrow;
     } on TimeoutException {
-      throw ApiException('The parking server took too long to respond.');
-    } finally {
-      client.close(force: true);
+      throw ApiException('The parking server at $baseUrl took too long to respond.');
+    } catch (e) {
+      throw ApiException('Cannot connect to $baseUrl. Check that the backend is running and API_BASE is reachable from this device.');
     }
   }
 }

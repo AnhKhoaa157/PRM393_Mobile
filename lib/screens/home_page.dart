@@ -10,10 +10,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool loading = true;
-  double? balance;
-  List<Map<String, dynamic>> reservations = [],
-      packages = [],
-      notifications = [];
+  double? balance = 0;
+  List<Map<String, dynamic>> packages = [], notifications = [];
 
   @override
   void initState() {
@@ -23,35 +21,37 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> load() async {
     setState(() => loading = true);
-    try {
-      final token = widget.session.token!;
-      final results = await Future.wait([
-        widget.session.api.request('/users/wallet', token: token),
-        widget.session.api.request('/users/reservations', token: token),
-        widget.session.api.request('/users/long-term/packages', token: token),
-        widget.session.api.request('/users/notifications', token: token),
-      ]);
-      final wallet = _data(results[0]);
-      if (mounted)
-        setState(() {
-          balance = (wallet['walletBalance'] as num?)?.toDouble() ?? 0;
-          reservations = _items(results[1]);
-          packages = _items(results[2], 'packages');
-          if (packages.isEmpty) packages = _items(results[2]);
-          notifications = _items(results[3]);
-        });
-    } catch (_) {
-      // Individual screens retain their own useful errors; home remains usable offline.
+    final token = widget.session.token!;
+    final results = await Future.wait([
+      _requestOrNull('/users/wallet', token),
+      _requestOrNull('/users/long-term/packages', token),
+      _requestOrNull('/users/notifications', token),
+    ]);
+    if (mounted) {
+      setState(() {
+        if (results[0] != null) {
+          balance = _asNum(_data(results[0])['walletBalance']);
+        }
+        if (results[1] != null) {
+          packages = _items(results[1], 'packages');
+          if (packages.isEmpty) packages = _items(results[1]);
+        }
+        if (results[2] != null) notifications = _items(results[2]);
+      });
     }
     if (mounted) setState(() => loading = false);
   }
 
+  Future<dynamic> _requestOrNull(String path, String token) async {
+    try {
+      return await widget.session.api.request(path, token: token);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final active = reservations
-        .where(
-            (r) => !['completed', 'cancelled', 'expired'].contains(r['status']))
-        .length;
     return RefreshIndicator(
       onRefresh: load,
       child: ListView(padding: EdgeInsets.zero, children: [
@@ -113,12 +113,6 @@ class _HomePageState extends State<HomePage> {
                               color: Colors.white,
                               fontSize: 27,
                               fontWeight: FontWeight.w900)),
-                      if (active > 0)
-                        Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(
-                                '$active active reservation${active == 1 ? '' : 's'}',
-                                style: const TextStyle(color: Colors.white))),
                     ])),
           ]),
         ),
@@ -132,12 +126,10 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(height: 12),
               Row(children: [
-                _quick(
-                    Icons.calendar_month_outlined, 'Reserve', 1, Colors.orange),
-                _quick(Icons.account_balance_wallet_outlined, 'Top up', 3,
+                _quick(Icons.account_balance_wallet_outlined, 'Top up', 2,
                     Colors.blue),
                 _quick(
-                    Icons.inventory_2_outlined, 'Packages', 4, Colors.purple),
+                    Icons.inventory_2_outlined, 'Packages', 3, Colors.purple),
                 _quick(Icons.qr_code_2_outlined, 'My QR', -1, Colors.teal),
               ]),
               const SizedBox(height: 26),
@@ -145,21 +137,14 @@ class _HomePageState extends State<HomePage> {
                 _warning(
                     'Incomplete profile',
                     'Add a license plate before making a reservation.',
-                    () => widget.openTab(5)),
-              if (reservations.isNotEmpty) ...[
-                const Text('Active reservations',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                const SizedBox(height: 10),
-                ...reservations.take(3).map(_reservationCard)
-              ],
+                    () => widget.openTab(4)),
               if (packages.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 const Text('Subscription packages',
                     style:
                         TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                 const SizedBox(height: 10),
-                ...packages.take(3).map(_packageCard)
+                ...packages.take(3).map(_packageCardClean)
               ],
             ])),
       ]),
@@ -222,17 +207,99 @@ class _HomePageState extends State<HomePage> {
           subtitle: Text('${p['durationDays'] ?? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'} days'),
           trailing: Text('${_money(_asNum(p['price']))} VND',
               style: const TextStyle(fontWeight: FontWeight.bold))));
+
+  Widget _reservationCardClean(Map<String, dynamic> reservation) => Card(
+      child: ListTile(
+          leading:
+              const CircleAvatar(child: Icon(Icons.local_parking_outlined)),
+          title: Text((reservation['building'] is Map
+                  ? reservation['building']['name']
+                  : null) ??
+              'Parking reservation'),
+          subtitle: Text(
+              "${reservation['plateNumber'] ?? ''} • ${reservation['status'] ?? 'pending'}"),
+          trailing: Text(
+              _asNum(reservation['fee']) == 0
+                  ? ''
+                  : "${_money(_asNum(reservation['fee']))} VND")));
+
+  Widget _packageCardClean(Map<String, dynamic> package) => Card(
+      child: ListTile(
+          leading: const CircleAvatar(
+              backgroundColor: Color(0x1a7c3aed),
+              child:
+                  Icon(Icons.inventory_2_outlined, color: Colors.deepPurple)),
+          title: Text((package['name'] ?? 'Parking package').toString()),
+          subtitle: Text("${package['durationDays'] ?? '—'} days"),
+          trailing: Text("${_money(_asNum(package['price']))} VND",
+              style: const TextStyle(fontWeight: FontWeight.bold))));
+  Future<void> _markRead(Map<String, dynamic> notification) async {
+    final id = notification['_id']?.toString();
+    if (id == null || id.isEmpty || notification['isRead'] == true) return;
+    try {
+      await widget.session.api.request('/users/notifications/$id/read',
+          method: 'PATCH', token: widget.session.token);
+      if (mounted) setState(() => notification['isRead'] = true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      await widget.session.api.request('/users/notifications/read-all',
+          method: 'PATCH', token: widget.session.token);
+      if (mounted) {
+        setState(() {
+          for (final notification in notifications) {
+            notification['isRead'] = true;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
   void _notifications() => showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (_) => ListView(children: [
-            const ListTile(
-                title: Text('Notifications',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            if (notifications.isEmpty)
-              const ListTile(title: Text('No notifications yet.')),
-            ...notifications.map((n) => ListTile(
-                title: Text('${n['title'] ?? 'Notification'}'),
-                subtitle: Text('${n['message'] ?? ''}')))
-          ]));
+      builder: (_) => StatefulBuilder(
+          builder: (context, setSheetState) => ListView(children: [
+                ListTile(
+                    title: const Text('Notifications',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: TextButton(
+                        onPressed: notifications.any((n) => n['isRead'] != true)
+                            ? () async {
+                                await _markAllRead();
+                                setSheetState(() {});
+                              }
+                            : null,
+                        child: const Text('Read all'))),
+                if (notifications.isEmpty)
+                  const ListTile(title: Text('No notifications yet.')),
+                ...notifications.map((notification) => ListTile(
+                    leading: Icon(
+                        notification['isRead'] == true
+                            ? Icons.notifications_none
+                            : Icons.notifications,
+                        color: notification['isRead'] == true ? _muted : _sky),
+                    title: Text('${notification['title'] ?? 'Notification'}',
+                        style: TextStyle(
+                            fontWeight: notification['isRead'] == true
+                                ? FontWeight.normal
+                                : FontWeight.w700)),
+                    subtitle: Text('${notification['message'] ?? ''}'),
+                    onTap: () async {
+                      await _markRead(notification);
+                      setSheetState(() {});
+                    }))
+              ])));
 }

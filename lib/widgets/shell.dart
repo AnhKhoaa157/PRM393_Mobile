@@ -14,26 +14,22 @@ class _ShellState extends State<Shell> {
     final pages = [
       HomePage(
           session: widget.session, openTab: (i) => setState(() => tab = i)),
-      ReservationsPage(session: widget.session),
       HistoryPage(session: widget.session),
       WalletPage(session: widget.session),
       PackagesPage(session: widget.session),
       ProfilePage(session: widget.session)
     ];
+    final selectedTab = tab.clamp(0, pages.length - 1) as int;
     return Scaffold(
-      body: IndexedStack(index: tab, children: pages),
+      body: IndexedStack(index: selectedTab, children: pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
+        selectedIndex: selectedTab,
         onDestinationSelected: (i) => setState(() => tab = i),
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home),
               label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.calendar_month_outlined),
-              selectedIcon: Icon(Icons.calendar_month),
-              label: 'Reserve'),
           NavigationDestination(
               icon: Icon(Icons.history_outlined),
               selectedIcon: Icon(Icons.history),
