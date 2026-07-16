@@ -84,10 +84,12 @@ class AppPill extends StatelessWidget {
 }
 
 class AppEmptyState extends StatelessWidget {
-  const AppEmptyState({super.key, required this.icon, required this.title, this.detail});
+  const AppEmptyState(
+      {super.key, required this.icon, required this.title, this.detail, this.action});
   final IconData icon;
   final String title;
   final String? detail;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => AppPanel(
@@ -105,6 +107,10 @@ class AppEmptyState extends StatelessWidget {
         if (detail != null) ...[
           const SizedBox(height: AppSpace.xs),
           Text(detail!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted)),
+        ],
+        if (action != null) ...[
+          const SizedBox(height: AppSpace.md),
+          action!,
         ]
       ])));
 }

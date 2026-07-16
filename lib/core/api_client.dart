@@ -1,9 +1,12 @@
 part of '../main.dart';
 
 class ApiException implements Exception {
-  ApiException(this.message, [this.status]);
+  ApiException(this.message, [this.status, this.code]);
   final String message;
   final int? status;
+
+  /// Structured backend error code (e.g. `BUILDING_REQUIRED`), when provided.
+  final String? code;
   @override
   String toString() => message;
 }
@@ -100,7 +103,10 @@ class ApiClient {
         final message = payload is Map && payload['message'] != null
             ? payload['message'].toString()
             : 'Request failed (${response.statusCode})';
-        throw ApiException(message, response.statusCode);
+        final code = payload is Map
+            ? (payload['errorCode'] ?? payload['code'])?.toString()
+            : null;
+        throw ApiException(message, response.statusCode, code);
       }
       return payload;
     } on ApiException catch (e) {

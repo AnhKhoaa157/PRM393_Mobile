@@ -7,24 +7,58 @@ class ParkingApp extends StatefulWidget {
   State<ParkingApp> createState() => _ParkingAppState();
 }
 
-class _ParkingAppState extends State<ParkingApp> {
+class _ParkingAppState extends State<ParkingApp> with WidgetsBindingObserver {
   final session = SessionController(ApiClient());
+  String? resetToken;
 
   @override
   void initState() {
     super.initState();
+    resetToken = _resetTokenFromLaunchRoute();
+    WidgetsBinding.instance.addObserver(this);
     session.addListener(_refresh);
     session.restore();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     session.removeListener(_refresh);
     session.dispose();
     super.dispose();
   }
 
   void _refresh() => setState(() {});
+
+  String? _resetTokenFromLaunchRoute() {
+    final routes = [
+      WidgetsBinding.instance.platformDispatcher.defaultRouteName,
+      Uri.base.toString(),
+    ];
+    for (final route in routes) {
+      final token = _resetTokenFromRoute(route);
+      if (token != null) return token;
+    }
+    return null;
+  }
+
+  String? _resetTokenFromRoute(String route) {
+    final uri = Uri.tryParse(route);
+    if (uri == null) return null;
+    final isResetRoute =
+        (uri.scheme == 'pbms' && uri.host == 'reset-password') ||
+            uri.path.endsWith('/reset-password');
+    final token = uri.queryParameters['token']?.trim();
+    return isResetRoute && token != null && token.isNotEmpty ? token : null;
+  }
+
+  @override
+  Future<bool> didPushRoute(String route) async {
+    final token = _resetTokenFromRoute(route);
+    if (token == null || !mounted) return false;
+    setState(() => resetToken = token);
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -78,7 +112,12 @@ class _ParkingAppState extends State<ParkingApp> {
                 behavior: SnackBarBehavior.floating,
                 backgroundColor: AppColors.foreground,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)))),
-        home: session.restoring
+        home: resetToken != null
+            ? ResetPasswordPage(
+                session: session,
+                token: resetToken!,
+                onComplete: () => setState(() => resetToken = null))
+            : session.restoring
             ? const Scaffold(
                 body: Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [

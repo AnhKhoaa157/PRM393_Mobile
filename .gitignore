@@ -5,6 +5,7 @@
 .flutter-plugins-dependencies
 .env
 .agents
+.claude
 .docs
 build/
 

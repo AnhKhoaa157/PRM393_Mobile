@@ -14,11 +14,39 @@ class _HomePageState extends State<HomePage> {
   double? balance = 0;
   List<Map<String, dynamic>> packages = [];
   List<Map<String, dynamic>> notifications = [];
+  List<Map<String, dynamic>> feedbackReplies = [];
+  Map<String, dynamic>? activeSession;
+  final feedbackStorage = const FlutterSecureStorage();
+  Set<String> readFeedbackIds = <String>{};
 
   @override
   void initState() {
     super.initState();
+    _loadFeedbackReadIds();
     load();
+  }
+
+  String get _feedbackReadKey =>
+      'pbms_feedback_read_ids:${widget.session.user!.id}';
+
+  Future<void> _loadFeedbackReadIds() async {
+    try {
+      final raw = await feedbackStorage.read(key: _feedbackReadKey);
+      final values = raw == null ? <dynamic>[] : jsonDecode(raw);
+      if (values is List && mounted) {
+        setState(() => readFeedbackIds = values.map((value) => '$value').toSet());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _markFeedbackRead(Map<String, dynamic> reply) async {
+    final id = '${reply['_id'] ?? ''}';
+    if (id.isEmpty || readFeedbackIds.contains(id)) return;
+    final next = {...readFeedbackIds, id};
+    setState(() => readFeedbackIds = next);
+    try {
+      await feedbackStorage.write(key: _feedbackReadKey, value: jsonEncode(next.toList()));
+    } catch (_) {}
   }
 
   Future<void> load() async {
@@ -28,6 +56,8 @@ class _HomePageState extends State<HomePage> {
       _requestOrNull('/users/wallet', token),
       _requestOrNull('/users/long-term/packages', token),
       _requestOrNull('/users/notifications', token),
+      _requestOrNull('/users/feedbacks/me', token),
+      _requestOrNull('/users/parking-history', token),
     ]);
     if (mounted) {
       setState(() {
@@ -37,6 +67,18 @@ class _HomePageState extends State<HomePage> {
           if (packages.isEmpty) packages = _items(results[1]);
         }
         if (results[2] != null) notifications = _items(results[2]);
+        if (results[3] != null) {
+          feedbackReplies = _items(results[3])
+              .where((item) => '${item['staffReply'] ?? ''}'.trim().isNotEmpty)
+              .toList();
+        }
+        activeSession = null;
+        if (results[4] != null) {
+          activeSession = _items(results[4]).cast<Map<String, dynamic>>().firstWhere(
+              (item) => item['status'] == 'active',
+              orElse: () => <String, dynamic>{});
+          if (activeSession!.isEmpty) activeSession = null;
+        }
         loading = false;
       });
     }
@@ -53,7 +95,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final user = widget.session.user!;
-    final unread = notifications.where((item) => item['isRead'] != true).length;
+    final unread = notifications.where((item) => item['isRead'] != true).length +
+        feedbackReplies.where((item) => !readFeedbackIds.contains('${item['_id'] ?? ''}')).length;
     return RefreshIndicator(
         onRefresh: load,
         child: CustomScrollView(slivers: [
@@ -97,6 +140,10 @@ class _HomePageState extends State<HomePage> {
                 const AppSectionTitle('Quick actions'),
                 const SizedBox(height: AppSpace.sm),
                 _quickActions(),
+                if (activeSession != null) ...[
+                  const SizedBox(height: AppSpace.lg),
+                  _activeParkingCard(),
+                ],
                 if (user.plates.isEmpty) ...[
                   const SizedBox(height: AppSpace.lg),
                   _profilePrompt(),
@@ -134,18 +181,29 @@ class _HomePageState extends State<HomePage> {
             label: const Text('Top up wallet')),
       ]));
 
-  Widget _quickActions() => Row(children: [
-        _quickAction(Icons.account_balance_wallet_outlined, 'Top up', AppColors.brand, () => widget.openTab(2)),
-        const SizedBox(width: AppSpace.sm),
-        _quickAction(Icons.business_outlined, 'Buildings', AppColors.success, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => BuildingsPage(session: widget.session)))),
-        const SizedBox(width: AppSpace.sm),
-        _quickAction(Icons.inventory_2_outlined, 'Packages', const Color(0xff8b3bb6), () => widget.openTab(3)),
-        const SizedBox(width: AppSpace.sm),
-        _quickAction(Icons.qr_code_2_outlined, 'My QR', AppColors.success, _showQr),
-      ]);
+  Widget _quickActions() {
+    final actions = <(IconData, String, Color, VoidCallback)>[
+      (Icons.account_balance_wallet_outlined, 'Top up', AppColors.brand, () => widget.openTab(2)),
+      (Icons.business_outlined, 'Buildings', AppColors.success, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => BuildingsPage(session: widget.session)))),
+      (Icons.inventory_2_outlined, 'Packages', const Color(0xff8b3bb6), () => widget.openTab(3)),
+      (Icons.qr_code_2_outlined, 'My QR', AppColors.success, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VehicleQrPage(session: widget.session, onAddVehicle: () => widget.openTab(4))))),
+      (Icons.report_problem_outlined, 'Incidents', AppColors.danger, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => IncidentPage(session: widget.session)))),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 480 ? actions.length : 3;
+      final tileWidth = (constraints.maxWidth - AppSpace.sm * (columns - 1)) / columns;
+      return Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: actions
+              .map((action) => SizedBox(
+                  width: tileWidth,
+                  child: _quickAction(action.$1, action.$2, action.$3, action.$4)))
+              .toList());
+    });
+  }
 
-  Widget _quickAction(IconData icon, String label, Color color, VoidCallback onTap) => Expanded(
-      child: Semantics(
+  Widget _quickAction(IconData icon, String label, Color color, VoidCallback onTap) => Semantics(
           button: true,
           label: label,
           child: InkWell(
@@ -162,7 +220,7 @@ class _HomePageState extends State<HomePage> {
                         child: Icon(icon, color: color)),
                     const SizedBox(height: AppSpace.xs),
                     Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                  ])))));
+                  ]))));
 
   Widget _profilePrompt() => AppPanel(
       color: AppColors.warningSoft,
@@ -173,6 +231,23 @@ class _HomePageState extends State<HomePage> {
           subtitle: const Text('Add a license plate to your parking profile.'),
           trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 17),
           onTap: () => widget.openTab(4)));
+
+  Widget _activeParkingCard() {
+    final building = activeSession!['building'] is Map
+        ? '${activeSession!['building']['name'] ?? 'Parking location'}'
+        : 'Parking location';
+    return AppPanel(
+        color: AppColors.successSoft,
+        child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.local_parking_outlined,
+                color: AppColors.success),
+            title: const Text('Vehicle currently parked',
+                style: TextStyle(fontWeight: FontWeight.w900)),
+            subtitle: Text('${activeSession!['plateNumber'] ?? 'Vehicle'} · $building'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => widget.openTab(1)));
+  }
 
   Widget _packageCard(Map<String, dynamic> package) => Padding(
       padding: const EdgeInsets.only(bottom: AppSpace.sm),
@@ -192,63 +267,6 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: AppSpace.sm),
             Text('${_money(_asNum(package['price']))} VND', style: const TextStyle(color: AppColors.brand, fontWeight: FontWeight.w900)),
           ])));
-
-  Future<void> _showQr() async {
-    final qrPlates = widget.session.user!.plates
-        .where((plate) => plate.qrCode.isNotEmpty)
-        .toList();
-    if (qrPlates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No vehicle QR is available. Add a license plate first.')));
-      return;
-    }
-    Plate? defaultPlate;
-    for (final candidate in qrPlates) {
-      if (candidate.isDefault) {
-        defaultPlate = candidate;
-        break;
-      }
-    }
-    final plate = qrPlates.length == 1 || defaultPlate != null
-        ? defaultPlate ?? qrPlates.first
-        : await showVehiclePicker(context,
-            plates: qrPlates,
-            title: 'Choose a vehicle',
-            description: 'Select the vehicle for your gate QR code.');
-    if (plate == null || !mounted) return;
-    showDialog<void>(
-        context: context,
-        builder: (dialogContext) => Dialog(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 340),
-                child: Padding(
-                    padding: const EdgeInsets.all(AppSpace.lg),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('Vehicle QR check-in',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: AppSpace.lg),
-                      SizedBox.square(
-                          dimension: 220,
-                          child: QrImageView(data: plate.qrCode, size: 220)),
-                      const SizedBox(height: AppSpace.sm),
-                      Text(plate.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: AppColors.brand,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16)),
-                      const SizedBox(height: AppSpace.xxs),
-                      const Text('Show this code to staff at the gate to identify your vehicle.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.muted)),
-                      const SizedBox(height: AppSpace.sm),
-                      Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              child: const Text('Close')))
-                    ])))));
-  }
 
   Future<void> _markRead(Map<String, dynamic> notification) async {
     final id = notification['_id']?.toString();
@@ -280,40 +298,128 @@ class _HomePageState extends State<HomePage> {
       builder: (_) => StatefulBuilder(
           builder: (context, setSheetState) => SafeArea(
               child: Padding(
-                  padding: const EdgeInsets.fromLTRB(AppSpace.md, 0, AppSpace.md, AppSpace.md),
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpace.md, 0, AppSpace.md, AppSpace.md),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Row(children: [
-                      const Expanded(child: Text('Notifications', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
+                      const Expanded(
+                          child: Text('Updates',
+                              style: TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.w900))),
                       TextButton(
-                          onPressed: notifications.any((item) => item['isRead'] != true)
+                          onPressed: notifications.any(
+                                  (item) => item['isRead'] != true)
                               ? () async {
                                   await _markAllRead();
                                   setSheetState(() {});
                                 }
                               : null,
-                          child: const Text('Mark all read')),
+                          child: const Text('Mark notifications read')),
                     ]),
                     const SizedBox(height: AppSpace.xs),
-                    if (notifications.isEmpty)
-                      const AppEmptyState(icon: Icons.notifications_none, title: 'Nothing new', detail: 'You are all caught up.')
+                    if (notifications.isEmpty && feedbackReplies.isEmpty)
+                      const AppEmptyState(
+                          icon: Icons.notifications_none,
+                          title: 'Nothing new',
+                          detail: 'You are all caught up.')
                     else
                       Flexible(
-                          child: ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: notifications.length,
-                              separatorBuilder: (context, index) => const Divider(height: 1),
-                              itemBuilder: (_, index) {
-                                final notification = notifications[index];
-                                final read = notification['isRead'] == true;
-                                return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
-                                    leading: Icon(read ? Icons.notifications_none : Icons.notifications, color: read ? AppColors.muted : AppColors.brand),
-                                    title: Text('${notification['title'] ?? 'Notification'}', style: TextStyle(fontWeight: read ? FontWeight.w600 : FontWeight.w800)),
-                                    subtitle: Text('${notification['message'] ?? ''}'),
-                                    onTap: () async {
-                                      await _markRead(notification);
-                                      setSheetState(() {});
-                                    });
-                              }))
+                          child: ListView(children: [
+                        if (notifications.isNotEmpty) ...[
+                          const _InboxHeading('Notifications'),
+                          ...notifications.map((notification) =>
+                              _notificationTile(notification, setSheetState)),
+                        ],
+                        if (feedbackReplies.isNotEmpty) ...[
+                          const SizedBox(height: AppSpace.sm),
+                          const _InboxHeading('Replies from parking management'),
+                          ...feedbackReplies.map((reply) =>
+                              _feedbackReplyTile(reply, setSheetState)),
+                        ],
+                      ]))
                   ])))));
+
+  Widget _notificationTile(
+          Map<String, dynamic> notification, StateSetter setSheetState) =>
+      ListTile(
+          contentPadding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+          leading: Icon(
+              notification['isRead'] == true
+                  ? Icons.notifications_none
+                  : Icons.notifications,
+              color: notification['isRead'] == true
+                  ? AppColors.muted
+                  : AppColors.brand),
+          title: Text('${notification['title'] ?? 'Notification'}',
+              style: TextStyle(
+                  fontWeight: notification['isRead'] == true
+                      ? FontWeight.w600
+                      : FontWeight.w800)),
+          subtitle: Text('${notification['message'] ?? ''}'),
+          onTap: () async {
+            await _markRead(notification);
+            setSheetState(() {});
+          });
+
+  Widget _feedbackReplyTile(
+          Map<String, dynamic> reply, StateSetter setSheetState) {
+    final read = readFeedbackIds.contains('${reply['_id'] ?? ''}');
+    final building = reply['building'] is Map
+        ? '${reply['building']['name'] ?? reply['building']['code'] ?? 'Parking management'}'
+        : 'Parking management';
+    final session = reply['parkingSession'] is Map
+        ? '${reply['parkingSession']['plateNumber'] ?? ''}'
+        : '';
+    return AppPanel(
+        padding: const EdgeInsets.all(AppSpace.sm),
+        color: read ? AppColors.surface : AppColors.brandSoft,
+        child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            onTap: () async {
+              await _markFeedbackRead(reply);
+              setSheetState(() {});
+            },
+            child: Padding(
+                padding: const EdgeInsets.all(AppSpace.xs),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.reply_outlined, color: AppColors.brand),
+                        const SizedBox(width: AppSpace.xs),
+                        Expanded(
+                            child: Text(building,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900))),
+                        if (!read)
+                          const AppPill('New',
+                              color: AppColors.brand,
+                              foreground: Colors.white),
+                      ]),
+                      if (session.isNotEmpty) ...[
+                        const SizedBox(height: AppSpace.xxs),
+                        Text(session,
+                            style: const TextStyle(color: AppColors.muted)),
+                      ],
+                      const SizedBox(height: AppSpace.xs),
+                      Text('${reply['staffReply']}',
+                          maxLines: read ? 4 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.foreground, height: 1.35)),
+                    ]))));
+}
+
+}
+
+class _InboxHeading extends StatelessWidget {
+  const _InboxHeading(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+      child: Text(text,
+          style: const TextStyle(
+              color: AppColors.muted, fontWeight: FontWeight.w800)));
 }
