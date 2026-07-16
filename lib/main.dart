@@ -13,17 +13,19 @@ part 'app.dart';
 part 'core/api_client.dart';
 part 'models/user.dart';
 part 'screens/auth_page.dart';
+part 'widgets/design_system.dart';
 part 'widgets/shell.dart';
 part 'screens/home_page.dart';
+part 'screens/buildings_page.dart';
 part 'screens/history_wallet_page.dart';
 part 'screens/packages_page.dart';
 part 'screens/profile_page.dart';
 
-const _sky = Color(0xff0ea5e9);
-const _skyDark = Color(0xff0369a1);
-const _background = Color(0xfff8fafc);
-const _text = Color(0xff0f172a);
-const _muted = Color(0xff64748b);
+const _sky = AppColors.brand;
+const _skyDark = AppColors.brandDeep;
+const _background = AppColors.canvas;
+const _text = AppColors.foreground;
+const _muted = AppColors.muted;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

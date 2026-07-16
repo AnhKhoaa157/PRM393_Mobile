@@ -8,41 +8,136 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool busy = false;
+  static const _maxPlates = 5;
+
   Future<void> _addPlate() async {
+    if (widget.session.user!.plates.length >= _maxPlates) {
+      showAppNotice(context, 'You can add up to $_maxPlates vehicles only.',
+          tone: AppNoticeTone.info);
+      return;
+    }
     final number = TextEditingController();
-    String type = 'car';
-    final input = await showDialog<Map<String, String>>(
-        context: context,
-        builder: (context) => StatefulBuilder(
-            builder: (context, setLocal) => AlertDialog(
-                    title: const Text('Add license plate'),
-                    content: Column(mainAxisSize: MainAxisSize.min, children: [
-                      TextField(
-                          controller: number,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration:
-                              const InputDecoration(labelText: 'Plate number')),
-                      DropdownButtonFormField(
-                          value: type,
-                          items: const [
-                            DropdownMenuItem(value: 'car', child: Text('Car')),
-                            DropdownMenuItem(
-                                value: 'motorcycle', child: Text('Motorcycle'))
-                          ],
-                          onChanged: (v) => setLocal(() => type = v!))
-                    ]),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel')),
-                      FilledButton(
-                          onPressed: () => Navigator.pop(
-                              context, {'number': number.text, 'type': type}),
-                          child: const Text('Add'))
-                    ])));
-    if (input == null || input['number']!.trim().isEmpty) return;
     try {
+      String type = 'car';
+      String? formError;
+      final input = await showDialog<Map<String, String>>(
+          context: context,
+          builder: (dialogContext) => StatefulBuilder(
+              builder: (context, setDialogState) => Dialog(
+                  insetPadding: const EdgeInsets.all(AppSpace.lg),
+                  child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(AppSpace.lg),
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(children: [
+                                  Container(
+                                      height: 46,
+                                      width: 46,
+                                      decoration: const BoxDecoration(
+                                          color: AppColors.brandSoft,
+                                          shape: BoxShape.circle),
+                                      child: const Icon(
+                                          Icons.directions_car_outlined,
+                                          color: AppColors.brand)),
+                                  const SizedBox(width: AppSpace.sm),
+                                  const Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text('Add license plate',
+                                            style: TextStyle(
+                                                fontSize: 23,
+                                                fontWeight: FontWeight.w900)),
+                                        Text('Add the vehicle you park with.',
+                                            style: TextStyle(
+                                                color: AppColors.muted))
+                                      ])),
+                                  IconButton(
+                                      tooltip: 'Close',
+                                      onPressed: () => Navigator.pop(dialogContext),
+                                      icon: const Icon(Icons.close))
+                                ]),
+                                const SizedBox(height: AppSpace.lg),
+                                TextField(
+                                    controller: number,
+                                    autofocus: true,
+                                    textCapitalization:
+                                        TextCapitalization.characters,
+                                    onChanged: (_) {
+                                      if (formError != null) {
+                                        setDialogState(() => formError = null);
+                                      }
+                                    },
+                                    decoration: const InputDecoration(
+                                        labelText: 'Plate number',
+                                        prefixIcon: Icon(Icons.pin_outlined))),
+                                const SizedBox(height: AppSpace.sm),
+                                DropdownButtonFormField<String>(
+                                    value: type,
+                                    isExpanded: true,
+                                    itemHeight: 58,
+                                    menuMaxHeight: 180,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.sm),
+                                    dropdownColor: AppColors.surface,
+                                    decoration: const InputDecoration(
+                                        labelText: 'Vehicle type',
+                                        prefixIcon:
+                                            Icon(Icons.category_outlined)),
+                                    items: const [
+                                      DropdownMenuItem(
+                                          value: 'car',
+                                          child: Row(children: [
+                                            Icon(Icons.directions_car_outlined,
+                                                color: AppColors.brand),
+                                            SizedBox(width: AppSpace.sm),
+                                            Text('Car')
+                                          ])),
+                                      DropdownMenuItem(
+                                          value: 'motorcycle',
+                                          child: Row(children: [
+                                            Icon(Icons.two_wheeler_outlined,
+                                                color: AppColors.brand),
+                                            SizedBox(width: AppSpace.sm),
+                                            Text('Motorcycle')
+                                          ])),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setDialogState(() => type = value);
+                                      }
+                                    }),
+                                if (formError != null)
+                                  Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: AppSpace.sm),
+                                      child: Text(formError!,
+                                          style: const TextStyle(
+                                              color: AppColors.danger))),
+                                const SizedBox(height: AppSpace.lg),
+                                FilledButton.icon(
+                                    onPressed: () {
+                                      if (number.text.trim().isEmpty) {
+                                        setDialogState(() => formError =
+                                            'Enter your license plate number.');
+                                        return;
+                                      }
+                                      Navigator.pop(dialogContext,
+                                          {'number': number.text, 'type': type});
+                                    },
+                                    icon: const Icon(Icons.add_circle_outline),
+                                    label: const Text('Add plate')),
+                                const SizedBox(height: AppSpace.xs),
+                                TextButton(
+                                    onPressed: () => Navigator.pop(dialogContext),
+                                    child: const Text('Cancel'))
+                              ]))))));
+      if (input == null) return;
       await widget.session.api.request('/users/license-plates',
           method: 'POST',
           token: widget.session.token,
@@ -52,222 +147,290 @@ class _ProfilePageState extends State<ProfilePage> {
           });
       await widget.session.reloadProfile();
       if (mounted) setState(() {});
-    } catch (e) {
-      if (mounted) _snack(e);
+    } catch (error) {
+      if (mounted) _snack(error);
+    } finally {
+      number.dispose();
     }
   }
+  Future<void> _removePlate(Plate plate) async {
+    var removing = false;
+    var removed = false;
+    String? error;
+    await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              Future<void> confirmRemoval() async {
+                setDialogState(() {
+                  removing = true;
+                  error = null;
+                });
+                try {
+                  await widget.session.api.request(
+                      '/users/license-plates/${plate.id}',
+                      method: 'DELETE',
+                      token: widget.session.token);
+                  await widget.session.reloadProfile();
+                  removed = true;
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (mounted) setState(() {});
+                } catch (value) {
+                  if (dialogContext.mounted) {
+                    setDialogState(() => error = value
+                        .toString()
+                        .replaceFirst('Exception: ', ''));
+                  }
+                } finally {
+                  if (!removed && dialogContext.mounted) {
+                    setDialogState(() => removing = false);
+                  }
+                }
+              }
 
-  Future<void> _removePlate(Plate p) async {
-    try {
-      await widget.session.api.request('/users/license-plates/${p.id}',
-          method: 'DELETE', token: widget.session.token);
-      await widget.session.reloadProfile();
-      if (mounted) setState(() {});
-    } catch (e) {
-      if (mounted) _snack(e);
-    }
+              return Dialog(
+                  insetPadding: const EdgeInsets.all(AppSpace.lg),
+                  child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: Padding(
+                          padding: const EdgeInsets.all(AppSpace.lg),
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                    height: 52,
+                                    width: 52,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                        color: AppColors.dangerSoft,
+                                        shape: BoxShape.circle),
+                                    child: const Icon(Icons.delete_outline,
+                                        color: AppColors.danger)),
+                                const SizedBox(height: AppSpace.md),
+                                const Text('Remove this vehicle?',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 23,
+                                        fontWeight: FontWeight.w900)),
+                                const SizedBox(height: AppSpace.xs),
+                                Text(plate.number,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        color: AppColors.danger,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900)),
+                                const SizedBox(height: AppSpace.sm),
+                                const Text(
+                                    'This will remove the vehicle and its gate QR code from your account. This action cannot be undone.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        color: AppColors.muted, height: 1.4)),
+                                if (error != null)
+                                  Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: AppSpace.sm),
+                                      child: Text(error!,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                              color: AppColors.danger))),
+                                const SizedBox(height: AppSpace.lg),
+                                FilledButton.icon(
+                                    onPressed: removing ? null : confirmRemoval,
+                                    style: FilledButton.styleFrom(
+                                        backgroundColor: AppColors.danger),
+                                    icon: removing
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2))
+                                        : const Icon(Icons.delete_outline),
+                                    label: Text(removing
+                                        ? 'Removing vehicle...'
+                                        : 'Remove vehicle')),
+                                const SizedBox(height: AppSpace.xs),
+                                TextButton(
+                                    onPressed: removing
+                                        ? null
+                                        : () => Navigator.pop(dialogContext),
+                                    child: const Text('Keep vehicle'))
+                              ]))));
+            }));
   }
-
-  Future<void> _setDefaultPlate(Plate p) async {
-    if (p.isDefault) return;
-    try {
-      await widget.session.api.request('/users/license-plates/${p.id}/default',
-          method: 'PATCH', token: widget.session.token);
-      await widget.session.reloadProfile();
-      if (mounted) setState(() {});
-    } catch (e) {
-      if (mounted) _snack(e);
-    }
-  }
-
+  Future<void> _setDefault(Plate plate) async { if(plate.isDefault)return; try {await widget.session.api.request('/users/license-plates/${plate.id}/default',method:'PATCH',token:widget.session.token);await widget.session.reloadProfile();if(mounted)setState((){});}catch(error){if(mounted)_snack(error);} }
   Future<void> _editProfile() async {
     final name = TextEditingController(text: widget.session.user!.name);
     final phone = TextEditingController(text: widget.session.user!.phone);
-    final save = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-                title: const Text('Edit profile'),
-                content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  TextField(
-                      controller: name,
-                      decoration:
-                          const InputDecoration(labelText: 'Full name')),
-                  const SizedBox(height: 12),
-                  TextField(
-                      controller: phone,
-                      decoration: const InputDecoration(labelText: 'Phone'))
-                ]),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Save'))
-                ]));
-    if (save != true) return;
     try {
+      final save = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+              insetPadding: const EdgeInsets.all(AppSpace.lg),
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 390),
+                  child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpace.lg),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(children: [
+                              Container(
+                                  height: 46,
+                                  width: 46,
+                                  decoration: const BoxDecoration(
+                                      color: AppColors.brandSoft,
+                                      shape: BoxShape.circle),
+                                  child: const Icon(Icons.person_outline,
+                                      color: AppColors.brand)),
+                              const SizedBox(width: AppSpace.sm),
+                              const Expanded(
+                                  child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                    Text('Edit profile',
+                                        style: TextStyle(
+                                            fontSize: 23,
+                                            fontWeight: FontWeight.w900)),
+                                    Text('Keep your details up to date',
+                                        style: TextStyle(color: AppColors.muted))
+                                  ])),
+                              IconButton(
+                                  tooltip: 'Close',
+                                  onPressed: () => Navigator.pop(dialogContext),
+                                  icon: const Icon(Icons.close))
+                            ]),
+                            const SizedBox(height: AppSpace.lg),
+                            TextField(
+                                controller: name,
+                                autofocus: true,
+                                textCapitalization: TextCapitalization.words,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                    labelText: 'Full name',
+                                    prefixIcon: Icon(Icons.badge_outlined))),
+                            const SizedBox(height: AppSpace.sm),
+                            TextField(
+                                controller: phone,
+                                keyboardType: TextInputType.phone,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => Navigator.pop(dialogContext, true),
+                                decoration: const InputDecoration(
+                                    labelText: 'Phone number',
+                                    prefixIcon: Icon(Icons.phone_outlined))),
+                            const SizedBox(height: AppSpace.lg),
+                            FilledButton.icon(
+                                onPressed: () => Navigator.pop(dialogContext, true),
+                                icon: const Icon(Icons.check_circle_outline),
+                                label: const Text('Save changes')),
+                            const SizedBox(height: AppSpace.xs),
+                            TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Cancel'))
+                          ])))));
+      if (save != true) return;
       await widget.session.api.request('/users/profile',
           method: 'PUT',
           token: widget.session.token,
           body: {'fullName': name.text.trim(), 'phone': phone.text.trim()});
       await widget.session.reloadProfile();
       if (mounted) setState(() {});
-    } catch (e) {
-      if (mounted) _snack(e);
+    } catch (error) {
+      if (mounted) _snack(error);
+    } finally {
+      name.dispose();
+      phone.dispose();
     }
   }
-
   Future<void> _password() async {
-    final old = TextEditingController();
+    final current = TextEditingController();
     final next = TextEditingController();
-    final save = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-                title: const Text('Change password'),
-                content: Column(mainAxisSize: MainAxisSize.min, children: [
-                  TextField(
-                      controller: old,
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'Current password')),
-                  const SizedBox(height: 12),
-                  TextField(
-                      controller: next,
-                      obscureText: true,
-                      decoration:
-                          const InputDecoration(labelText: 'New password'))
-                ]),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Update'))
-                ]));
-    if (save != true) return;
     try {
-      await widget.session.api.request('/users/profile/password',
-          method: 'PUT',
-          token: widget.session.token,
-          body: {'currentPassword': old.text, 'newPassword': next.text});
+      final save = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+              insetPadding: const EdgeInsets.all(AppSpace.lg),
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 390),
+                  child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpace.lg),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(children: [
+                              Container(
+                                  height: 46,
+                                  width: 46,
+                                  decoration: const BoxDecoration(color: AppColors.brandSoft, shape: BoxShape.circle),
+                                  child: const Icon(Icons.lock_reset_outlined, color: AppColors.brand)),
+                              const SizedBox(width: AppSpace.sm),
+                              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('Change password', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900)),
+                                Text('Use a strong password you do not reuse.', style: TextStyle(color: AppColors.muted))
+                              ])),
+                              IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))
+                            ]),
+                            const SizedBox(height: AppSpace.lg),
+                            TextField(controller: current, autofocus: true, obscureText: true, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Current password', prefixIcon: Icon(Icons.lock_outline))),
+                            const SizedBox(height: AppSpace.sm),
+                            TextField(controller: next, obscureText: true, textInputAction: TextInputAction.done, onSubmitted: (_) => Navigator.pop(dialogContext, true), decoration: const InputDecoration(labelText: 'New password', prefixIcon: Icon(Icons.password_outlined))),
+                            const SizedBox(height: AppSpace.lg),
+                            FilledButton.icon(onPressed: () => Navigator.pop(dialogContext, true), icon: const Icon(Icons.check_circle_outline), label: const Text('Update password')),
+                            const SizedBox(height: AppSpace.xs),
+                            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))
+                          ])))));
+      if (save != true) return;
+      await widget.session.api.request('/users/profile/password', method: 'PUT', token: widget.session.token, body: {'currentPassword': current.text, 'newPassword': next.text});
       if (mounted) _snack('Password updated.');
-    } catch (e) {
-      if (mounted) _snack(e);
+    } catch (error) {
+      if (mounted) _snack(error);
+    } finally {
+      current.dispose();
+      next.dispose();
     }
   }
-
   @override
-  Widget build(BuildContext context) {
-    final u = widget.session.user!;
-    return PageFrame(
-        title: 'Profile',
-        child: ListView(padding: const EdgeInsets.all(16), children: [
-          Card(
-              child: ListTile(
-                  leading: CircleAvatar(
-                      radius: 28,
-                      backgroundColor: _sky.withValues(alpha: .15),
-                      child: Text(
-                          u.name.isEmpty
-                              ? 'U'
-                              : u.name.substring(0, 1).toUpperCase(),
-                          style:
-                              const TextStyle(fontSize: 24, color: _skyDark))),
-                  title: Text(u.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
-                   subtitle: Text(
-                      "${u.email}\n${u.phone.isEmpty ? 'No phone number' : u.phone}"),
-                  isThreeLine: true,
-                  trailing: IconButton(
-                      onPressed: _editProfile,
-                      icon: const Icon(Icons.edit_outlined)))),
-          const SizedBox(height: 18),
+  Widget build(BuildContext context) { final user=widget.session.user!; return PageFrame(title:'Profile',child:ListView(padding:const EdgeInsets.all(AppSpace.lg),children:[AppPanel(child:Row(children:[Container(height:60,width:60,decoration:const BoxDecoration(color:AppColors.brandSoft,shape:BoxShape.circle),alignment:Alignment.center,child:Text(user.name.isEmpty?'U':user.name.substring(0,1).toUpperCase(),style:const TextStyle(color:AppColors.brand,fontSize:26,fontWeight:FontWeight.w900))),const SizedBox(width:AppSpace.md),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(user.name,style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),const SizedBox(height:3),Text(user.email,style:const TextStyle(color:AppColors.muted)),Text(user.phone.isEmpty?'No phone number added':user.phone,style:const TextStyle(color:AppColors.muted))])),IconButton(tooltip:'Edit profile',onPressed:_editProfile,icon:const Icon(Icons.edit_outlined))])),const SizedBox(height:AppSpace.xl),AppSectionTitle('License plates',action:TextButton.icon(onPressed:_addPlate,icon:const Icon(Icons.add),label:const Text('Add'))),const SizedBox(height:AppSpace.sm),if(user.plates.isEmpty)const AppEmptyState(icon:Icons.directions_car_outlined,title:'No license plates',detail:'Add your vehicle plate to complete your profile.'),...user.plates.map(_plateCard),const SizedBox(height:AppSpace.xl),const AppSectionTitle('Security'),const SizedBox(height:AppSpace.sm),AppPanel(child:Column(children:[ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.lock_outline,color:AppColors.brand),title:const Text('Change password',style:TextStyle(fontWeight:FontWeight.w800)),trailing:const Icon(Icons.chevron_right),onTap:_password),const Divider(height:1),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.logout_outlined,color:AppColors.danger),title:const Text('Sign out',style:TextStyle(color:AppColors.danger,fontWeight:FontWeight.w800)),onTap:widget.session.logout)])),const SizedBox(height:AppSpace.xl)])); }
+  Widget _plateCard(Plate plate) => Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.sm),
+      child: AppPanel(
+          child: Row(children: [
+        Container(
+            height: 44,
+            width: 44,
+            decoration: const BoxDecoration(
+                color: AppColors.surfaceMuted, shape: BoxShape.circle),
+            child: const Icon(Icons.directions_car_outlined,
+                color: AppColors.brand)),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(plate.number,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          const SizedBox(height: 3),
           Row(children: [
-            const Expanded(
-                child: Text('License plates',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
-            TextButton.icon(
-                onPressed: _addPlate,
-                icon: const Icon(Icons.add),
-                label: const Text('Add'))
-          ]),
-          if (u.plates.isEmpty)
-            const _Empty(
-                icon: Icons.directions_car_outlined,
-                text: 'No license plates added.'),
-          ...u.plates.map((p) => Card(
-              child: ListTile(
-                  leading: const CircleAvatar(
-                      child: Icon(Icons.directions_car_outlined)),
-                  title: Text(p.number,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle:
-                      Text(p.isDefault ? "${p.type} • Default" : p.type),
-                  /* legacy text with invalid nested quotes:
-                  subtitle: Text(
-                      '${p.type}${p.isDefault ? ' ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Default' : ''}'),
-                  */
-                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                     if (!p.isDefault)
-                       IconButton(
-                           tooltip: 'Set as default',
-                           onPressed: () => _setDefaultPlate(p),
-                           icon: const Icon(Icons.star_outline)),
-                     IconButton(
-                         onPressed: () => _removePlate(p),
-                         icon: const Icon(Icons.delete_outline),
-                         color: Colors.red)
-                    ])))),
-          const SizedBox(height: 18),
-          const Text('Security',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          Card(
-              child: ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Change password'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _password)),
-          Card(
-              child: ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Sign out',
-                      style: TextStyle(color: Colors.red)),
-                  onTap: widget.session.logout))
-        ]));
-  }
-
-  void _snack(Object e) => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
-}
-
-class _Empty extends StatelessWidget {
-  const _Empty({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-  @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 38),
-      child: Center(
-          child: Column(children: [
-        Icon(icon, size: 48, color: _muted),
-        const SizedBox(height: 10),
-        Text(text, style: const TextStyle(color: _muted))
+            Text(plate.type, style: const TextStyle(color: AppColors.muted)),
+            if (plate.isDefault) ...[
+              const SizedBox(width: AppSpace.xs),
+              const AppPill('Default',
+                  color: AppColors.successSoft, foreground: AppColors.success)
+            ]
+          ])
+        ])),
+        if (!plate.isDefault)
+          IconButton(
+              tooltip: 'Set as default',
+              onPressed: () => _setDefault(plate),
+              icon: const Icon(Icons.star_outline)),
+        IconButton(
+            tooltip: 'Remove plate',
+            onPressed: () => _removePlate(plate),
+            color: AppColors.danger,
+            icon: const Icon(Icons.delete_outline))
       ])));
-}
-
-double _asNum(dynamic value) =>
-    value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
-String _money(num amount) => amount
-    .toStringAsFixed(0)
-    .replaceAllMapped(RegExp(r'(?<!^)(?=(\d{3})+$)'), (_) => ',');
-String _date(dynamic value) {
-  if (value == null || '$value'.isEmpty) return 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
-  final parsed = DateTime.tryParse('$value');
-  if (parsed == null) return '$value';
-  final d = parsed.toLocal();
-  return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  void _snack(Object value)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(value.toString().replaceFirst('Exception: ',''))));
 }

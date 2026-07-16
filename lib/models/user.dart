@@ -28,13 +28,15 @@ class Plate {
       {required this.id,
       required this.number,
       required this.type,
-      required this.isDefault});
-  final String id, number, type;
+      required this.isDefault,
+      required this.qrCode});
+  final String id, number, type, qrCode;
   final bool isDefault;
   factory Plate.fromJson(Map<String, dynamic> json) => Plate(
         id: (json['_id'] ?? '').toString(),
         number: (json['plateNumber'] ?? '').toString(),
         type: (json['vehicleType'] ?? 'car').toString(),
         isDefault: json['isDefault'] == true,
+        qrCode: (json['qrCode'] ?? '').toString(),
       );
 }
