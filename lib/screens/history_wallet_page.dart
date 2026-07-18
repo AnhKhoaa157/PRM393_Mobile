@@ -77,8 +77,7 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
   Future<void> _showFeedback(Map<String, dynamic> session) async {
     final sessionId = '${session['_id'] ?? ''}';
     if (sessionId.isEmpty) return;
-    var rating = 0; var submitting = false; String? error;
-    final comment = TextEditingController();
+    var rating = 0; var submitting = false; String? error; var comment = '';
     final submitted = await showModalBottomSheet<bool>(
         context: context, isScrollControlled: true, showDragHandle: true,
         backgroundColor: Colors.white,
@@ -87,11 +86,11 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
             padding: EdgeInsets.fromLTRB(AppSpace.lg, 0, AppSpace.lg, MediaQuery.viewInsetsOf(sheetContext).bottom + AppSpace.lg),
             child: StatefulBuilder(builder: (context, setSheetState) {
               Future<void> submit() async {
-                if (rating == 0 || comment.text.trim().isEmpty) { setSheetState(() => error = 'Choose a rating and add a short comment.'); return; }
+                if (rating == 0 || comment.trim().isEmpty) { setSheetState(() => error = 'Choose a rating and add a short comment.'); return; }
                 setSheetState(() { submitting = true; error = null; });
                 try {
                   await widget.session.api.request('/users/feedbacks', method: 'POST', token: widget.session.token, body: {
-                    'parkingSession': sessionId, 'rating': rating, 'comment': comment.text.trim(),
+                    'parkingSession': sessionId, 'rating': rating, 'comment': comment.trim(),
                     if (session['building'] is Map) 'building': session['building']['_id'],
                   });
                   if (context.mounted) Navigator.pop(context, true);
@@ -108,7 +107,7 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
                     onPressed: submitting ? null : () => setSheetState(() => rating = index + 1),
                     iconSize: 36, color: const Color(0xFFCA8A04),
                     icon: Icon(index < rating ? Icons.star_rounded : Icons.star_outline_rounded)))),
-                TextField(controller: comment, enabled: !submitting, maxLength: 150, minLines: 3, maxLines: 5,
+                TextField(onChanged: (value) => comment = value, enabled: !submitting, maxLength: 150, minLines: 3, maxLines: 5,
                     decoration: const InputDecoration(labelText: 'Your feedback', hintText: 'Tell us what went well or could improve')),
                 if (error != null) Padding(padding: const EdgeInsets.only(top: AppSpace.xs), child: Text(error!, style: const TextStyle(color: AppColors.danger))),
                 const SizedBox(height: AppSpace.sm),
@@ -120,7 +119,6 @@ class _HistoryPageState extends State<HistoryPage> with TickerProviderStateMixin
                 ]),
               ]);
             })));
-    comment.dispose();
     if (submitted == true) { await load(); if (mounted) _snack('Thank you for your feedback.'); }
   }
 
@@ -1178,7 +1176,13 @@ class _WalletPageState extends State<WalletPage> with TickerProviderStateMixin {
     if (amount == null || amount <= 0) return;
     try {
       final result = await widget.session.api.request('/users/wallet/topup', method: 'POST', token: widget.session.token, body: {'amount': amount.round()});
-      final data = _data(result); final orderCode = '${data['orderCode'] ?? ''}';
+      final data = _data(result);
+      if (data['credited'] == true) {
+        await load();
+        if (mounted) _snack('Wallet topped up successfully.');
+        return;
+      }
+      final orderCode = '${data['orderCode'] ?? ''}';
       if (!mounted) return;
       await _showPaymentDetails(data, amount.round());
       if (orderCode.isNotEmpty) await _verifyTopUp(orderCode, quiet: true);
@@ -1766,8 +1770,17 @@ class _TransactionCardState extends State<_TransactionCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final credit = ['topup', 'refund', 'credit'].contains('${item['type']}');
-    final color = credit ? const Color(0xFF16A34A) : const Color(0xFFEF4444);
-    final bgColor = credit ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
+    final isTopUp = '${item['reason']}'.contains('topup');
+    final color = isTopUp
+        ? LightTheme.brandBlue
+        : credit
+            ? const Color(0xFF16A34A)
+            : const Color(0xFFEF4444);
+    final bgColor = isTopUp
+        ? const Color(0xFFDBEAFE)
+        : credit
+            ? const Color(0xFFDCFCE7)
+            : const Color(0xFFFEE2E2);
     final typeName = '${item['type']}'.toUpperCase();
     final desc = '${item['description'] ?? item['type'] ?? 'Transaction'}';
 

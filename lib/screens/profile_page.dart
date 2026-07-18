@@ -368,8 +368,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4)),
                   ],
                 ),
-                child: Column(
-                  children: [
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
                     // Change password
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
@@ -403,7 +407,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       title: Text('Sign out', style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w800, fontSize: 13.5)),
                       onTap: widget.session.logout,
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
