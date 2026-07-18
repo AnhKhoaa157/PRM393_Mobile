@@ -10,130 +10,16 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   static const _maxPlates = 5;
 
+
   Future<void> _addPlate() async {
     if (widget.session.user!.plates.length >= _maxPlates) {
       showAppNotice(context, 'You can add up to $_maxPlates vehicles only.', tone: AppNoticeTone.info);
       return;
     }
-    final number = TextEditingController();
     try {
-      String type = 'car';
-      String? formError;
       final input = await showDialog<Map<String, String>>(
           context: context,
-          builder: (dialogContext) => StatefulBuilder(
-              builder: (context, setDialogState) => Dialog(
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  insetPadding: const EdgeInsets.all(AppSpace.lg),
-                  child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 390),
-                      child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(AppSpace.lg),
-                          child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(children: [
-                                  Container(
-                                      height: 44, width: 44,
-                                      decoration: BoxDecoration(
-                                          color: LightTheme.brandBlue.withOpacity(0.08),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
-                                      child: const Icon(Icons.directions_car_outlined, color: LightTheme.brandBlue, size: 20)),
-                                  const SizedBox(width: AppSpace.sm),
-                                  const Expanded(
-                                      child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                        Text('Add license plate',
-                                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
-                                        Text('Add the vehicle you park with.',
-                                            style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
-                                      ])),
-                                  IconButton(
-                                      tooltip: 'Close',
-                                      onPressed: () => Navigator.pop(dialogContext),
-                                      icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
-                                ]),
-                                const SizedBox(height: AppSpace.lg),
-                                TextField(
-                                    controller: number,
-                                    autofocus: true,
-                                    textCapitalization: TextCapitalization.characters,
-                                    onChanged: (_) {
-                                      if (formError != null) {
-                                        setDialogState(() => formError = null);
-                                      }
-                                    },
-                                    decoration: InputDecoration(
-                                        labelText: 'Plate number',
-                                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                        prefixIcon: const Icon(Icons.pin_outlined, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
-                                const SizedBox(height: AppSpace.sm),
-                                DropdownButtonFormField<String>(
-                                    value: type,
-                                    isExpanded: true,
-                                    itemHeight: 52,
-                                    menuMaxHeight: 180,
-                                    borderRadius: BorderRadius.circular(16),
-                                    dropdownColor: Colors.white,
-                                    decoration: InputDecoration(
-                                        labelText: 'Vehicle type',
-                                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                        prefixIcon: const Icon(Icons.category_outlined, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8))),
-                                    items: const [
-                                      DropdownMenuItem(
-                                          value: 'car',
-                                          child: Row(children: [
-                                            Icon(Icons.directions_car_outlined, color: LightTheme.brandBlue, size: 18),
-                                            SizedBox(width: AppSpace.sm),
-                                            Text('Car', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))
-                                          ])),
-                                      DropdownMenuItem(
-                                          value: 'motorcycle',
-                                          child: Row(children: [
-                                            Icon(Icons.two_wheeler_outlined, color: Color(0xFF7C3AED), size: 18),
-                                            SizedBox(width: AppSpace.sm),
-                                            Text('Motorcycle', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))
-                                          ])),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setDialogState(() => type = value);
-                                      }
-                                    }),
-                                if (formError != null)
-                                  Padding(
-                                      padding: const EdgeInsets.only(top: AppSpace.sm),
-                                      child: Text(formError!, style: const TextStyle(color: AppColors.danger, fontSize: 13, fontWeight: FontWeight.w600))),
-                                const SizedBox(height: AppSpace.lg),
-                                FilledButton.icon(
-                                    onPressed: () {
-                                      if (number.text.trim().isEmpty) {
-                                        setDialogState(() => formError = 'Enter your license plate number.');
-                                        return;
-                                      }
-                                      Navigator.pop(dialogContext, {'number': number.text, 'type': type});
-                                    },
-                                    style: FilledButton.styleFrom(
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                                    label: const Text('Add plate', style: TextStyle(fontWeight: FontWeight.w800))),
-                                const SizedBox(height: AppSpace.xs),
-                                TextButton(
-                                    onPressed: () => Navigator.pop(dialogContext),
-                                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
-                              ]))))));
+          builder: (dialogContext) => const _AddPlateDialog());
       if (input == null) return;
       await widget.session.api.request('/users/license-plates',
           method: 'POST',
@@ -146,10 +32,9 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) setState(() {});
     } catch (error) {
       if (mounted) _snack(error);
-    } finally {
-      number.dispose();
     }
   }
+
 
   Future<void> _removePlate(Plate plate) async {
     var removing = false;
@@ -261,183 +146,46 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+
   Future<void> _editProfile() async {
-    final name = TextEditingController(text: widget.session.user!.name);
-    final phone = TextEditingController(text: widget.session.user!.phone);
     try {
-      final save = await showDialog<bool>(
+      final input = await showDialog<Map<String, String>>(
           context: context,
-          builder: (dialogContext) => Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              insetPadding: const EdgeInsets.all(AppSpace.lg),
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 390),
-                  child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(AppSpace.lg),
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(children: [
-                              Container(
-                                  height: 44, width: 44,
-                                  decoration: BoxDecoration(
-                                      color: LightTheme.brandBlue.withOpacity(0.08),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
-                                  child: const Icon(Icons.person_outline_rounded, color: LightTheme.brandBlue, size: 20)),
-                              const SizedBox(width: AppSpace.sm),
-                              const Expanded(
-                                  child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                    Text('Edit profile',
-                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
-                                    Text('Keep your details up to date',
-                                        style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
-                                  ])),
-                              IconButton(
-                                  tooltip: 'Close',
-                                  onPressed: () => Navigator.pop(dialogContext),
-                                  icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
-                            ]),
-                            const SizedBox(height: AppSpace.lg),
-                            TextField(
-                                controller: name,
-                                autofocus: true,
-                                textCapitalization: TextCapitalization.words,
-                                textInputAction: TextInputAction.next,
-                                decoration: InputDecoration(
-                                    labelText: 'Full name',
-                                    labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    prefixIcon: const Icon(Icons.badge_outlined, size: 20),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
-                            const SizedBox(height: AppSpace.sm),
-                            TextField(
-                                controller: phone,
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => Navigator.pop(dialogContext, true),
-                                decoration: InputDecoration(
-                                    labelText: 'Phone number',
-                                    labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
-                            const SizedBox(height: AppSpace.lg),
-                            FilledButton.icon(
-                                onPressed: () => Navigator.pop(dialogContext, true),
-                                style: FilledButton.styleFrom(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                                label: const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w800))),
-                            const SizedBox(height: AppSpace.xs),
-                            TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
-                          ])))));
-      if (save != true) return;
+          builder: (dialogContext) => _EditProfileDialog(
+                initialName: widget.session.user!.name,
+                initialPhone: widget.session.user!.phone,
+              ));
+      if (input == null) return;
       await widget.session.api.request('/users/profile',
           method: 'PUT',
           token: widget.session.token,
-          body: {'fullName': name.text.trim(), 'phone': phone.text.trim()});
+          body: {'fullName': input['name']!.trim(), 'phone': input['phone']!.trim()});
       await widget.session.reloadProfile();
       if (mounted) setState(() {});
     } catch (error) {
       if (mounted) _snack(error);
-    } finally {
-      name.dispose();
-      phone.dispose();
     }
   }
 
   Future<void> _password() async {
-    final current = TextEditingController();
-    final next = TextEditingController();
     try {
-      final save = await showDialog<bool>(
+      final input = await showDialog<Map<String, String>>(
           context: context,
-          builder: (dialogContext) => Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              insetPadding: const EdgeInsets.all(AppSpace.lg),
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 390),
-                  child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(AppSpace.lg),
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(children: [
-                              Container(
-                                  height: 44, width: 44,
-                                  decoration: BoxDecoration(
-                                      color: LightTheme.brandBlue.withOpacity(0.08),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
-                                  child: const Icon(Icons.lock_reset_outlined, color: LightTheme.brandBlue, size: 20)),
-                              const SizedBox(width: AppSpace.sm),
-                              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text('Change password', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
-                                Text('Use a strong password.', style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
-                              ])),
-                              IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
-                            ]),
-                            const SizedBox(height: AppSpace.lg),
-                            TextField(
-                              controller: current,
-                              autofocus: true,
-                              obscureText: true,
-                              textInputAction: TextInputAction.next,
-                              decoration: InputDecoration(
-                                  labelText: 'Current password',
-                                  labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
-                            const SizedBox(height: AppSpace.sm),
-                            TextField(
-                              controller: next,
-                              obscureText: true,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => Navigator.pop(dialogContext, true),
-                              decoration: InputDecoration(
-                                  labelText: 'New password',
-                                  labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
-                            const SizedBox(height: AppSpace.lg),
-                            FilledButton.icon(
-                              onPressed: () => Navigator.pop(dialogContext, true),
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                              label: const Text('Update password', style: TextStyle(fontWeight: FontWeight.w800))),
-                            const SizedBox(height: AppSpace.xs),
-                            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
-                          ])))));
-      if (save != true) return;
-      await widget.session.api.request('/users/profile/password', method: 'PUT', token: widget.session.token, body: {'currentPassword': current.text, 'newPassword': next.text});
+          builder: (dialogContext) => const _ChangePasswordDialog());
+      if (input == null) return;
+      await widget.session.api.request('/users/profile/password',
+          method: 'PUT',
+          token: widget.session.token,
+          body: {
+            'currentPassword': input['current']!,
+            'newPassword': input['next']!
+          });
       if (mounted) _snack('Password updated.');
     } catch (error) {
       if (mounted) _snack(error);
-    } finally {
-      current.dispose();
-      next.dispose();
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -934,4 +682,357 @@ class _PlatesEmptyState extends StatelessWidget {
       ]),
     ),
   );
+}
+
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// STATEFUL DIALOGS (To prevent premature controller disposal crashes)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+class _AddPlateDialog extends StatefulWidget {
+  const _AddPlateDialog();
+
+  @override
+  State<_AddPlateDialog> createState() => _AddPlateDialogState();
+}
+
+class _AddPlateDialogState extends State<_AddPlateDialog> {
+  final _number = TextEditingController();
+  String _type = 'car';
+  String? _formError;
+
+  @override
+  void dispose() {
+    _number.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.all(AppSpace.lg),
+        child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390),
+            child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpace.lg),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Container(
+                            height: 44, width: 44,
+                            decoration: BoxDecoration(
+                                color: LightTheme.brandBlue.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
+                            child: const Icon(Icons.directions_car_outlined, color: LightTheme.brandBlue, size: 20)),
+                        const SizedBox(width: AppSpace.sm),
+                        const Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('Add license plate',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
+                              Text('Add the vehicle you park with.',
+                                  style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
+                            ])),
+                        IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
+                      ]),
+                      const SizedBox(height: AppSpace.lg),
+                      TextField(
+                          controller: _number,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (_) {
+                            if (_formError != null) {
+                              setState(() => _formError = null);
+                            }
+                          },
+                          decoration: InputDecoration(
+                              labelText: 'Plate number',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.pin_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
+                      const SizedBox(height: AppSpace.sm),
+                      DropdownButtonFormField<String>(
+                          value: _type,
+                          isExpanded: true,
+                          itemHeight: 52,
+                          menuMaxHeight: 180,
+                          borderRadius: BorderRadius.circular(16),
+                          dropdownColor: Colors.white,
+                          decoration: InputDecoration(
+                              labelText: 'Vehicle type',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.category_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8))),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'car',
+                                child: Row(children: [
+                                  Icon(Icons.directions_car_outlined, color: LightTheme.brandBlue, size: 18),
+                                  SizedBox(width: AppSpace.sm),
+                                  Text('Car', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))
+                                ])),
+                            DropdownMenuItem(
+                                value: 'motorcycle',
+                                child: Row(children: [
+                                  Icon(Icons.two_wheeler_outlined, color: Color(0xFF7C3AED), size: 18),
+                                  SizedBox(width: AppSpace.sm),
+                                  Text('Motorcycle', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))
+                                ])),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _type = value);
+                            }
+                          }),
+                      if (_formError != null)
+                        Padding(
+                            padding: const EdgeInsets.only(top: AppSpace.sm),
+                            child: Text(_formError!, style: const TextStyle(color: AppColors.danger, fontSize: 13, fontWeight: FontWeight.w600))),
+                      const SizedBox(height: AppSpace.lg),
+                      FilledButton.icon(
+                          onPressed: () {
+                            if (_number.text.trim().isEmpty) {
+                              setState(() => _formError = 'Enter your license plate number.');
+                              return;
+                            }
+                            Navigator.pop(context, {'number': _number.text, 'type': _type});
+                          },
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                          label: const Text('Add plate', style: TextStyle(fontWeight: FontWeight.w800))),
+                      const SizedBox(height: AppSpace.xs),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
+                    ]))));
+  }
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  const _EditProfileDialog({required this.initialName, required this.initialPhone});
+  final String initialName;
+  final String initialPhone;
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.initialName);
+    _phone = TextEditingController(text: widget.initialPhone);
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.all(AppSpace.lg),
+        child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390),
+            child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpace.lg),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Container(
+                            height: 44, width: 44,
+                            decoration: BoxDecoration(
+                                color: LightTheme.brandBlue.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
+                            child: const Icon(Icons.person_outline_rounded, color: LightTheme.brandBlue, size: 20)),
+                        const SizedBox(width: AppSpace.sm),
+                        const Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('Edit profile',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
+                              Text('Keep your details up to date',
+                                  style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
+                            ])),
+                        IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
+                      ]),
+                      const SizedBox(height: AppSpace.lg),
+                      TextField(
+                          controller: _name,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                              labelText: 'Full name',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
+                      const SizedBox(height: AppSpace.sm),
+                      TextField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) {
+                            Navigator.pop(context, {'name': _name.text, 'phone': _phone.text});
+                          },
+                          decoration: InputDecoration(
+                              labelText: 'Phone number',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
+                      const SizedBox(height: AppSpace.lg),
+                      FilledButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context, {'name': _name.text, 'phone': _phone.text});
+                          },
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w800))),
+                      const SizedBox(height: AppSpace.xs),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
+                    ]))));
+  }
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _current = TextEditingController();
+  final _next = TextEditingController();
+
+  @override
+  void dispose() {
+    _current.dispose();
+    _next.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.all(AppSpace.lg),
+        child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390),
+            child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpace.lg),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Container(
+                            height: 44, width: 44,
+                            decoration: BoxDecoration(
+                                color: LightTheme.brandBlue.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: LightTheme.brandBlue.withOpacity(0.15))),
+                            child: const Icon(Icons.lock_reset_outlined, color: LightTheme.brandBlue, size: 20)),
+                        const SizedBox(width: AppSpace.sm),
+                        const Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('Change password',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: LightTheme.textPrimary, letterSpacing: -0.4)),
+                              Text('Use a strong password.',
+                                  style: TextStyle(color: LightTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500))
+                            ])),
+                        IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 20, color: LightTheme.textSecondary))
+                      ]),
+                      const SizedBox(height: AppSpace.lg),
+                      TextField(
+                          controller: _current,
+                          autofocus: true,
+                          obscureText: true,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                              labelText: 'Current password',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
+                      const SizedBox(height: AppSpace.sm),
+                      TextField(
+                          controller: _next,
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) {
+                            Navigator.pop(context, {'current': _current.text, 'next': _next.text});
+                          },
+                          decoration: InputDecoration(
+                              labelText: 'New password',
+                              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              prefixIcon: const Icon(Icons.password_outlined, size: 20),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF00D2FF), width: 1.8)))),
+                      const SizedBox(height: AppSpace.lg),
+                      FilledButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context, {'current': _current.text, 'next': _next.text});
+                          },
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: const Text('Update password', style: TextStyle(fontWeight: FontWeight.w800))),
+                      const SizedBox(height: AppSpace.xs),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)))
+                    ]))));
+  }
 }
