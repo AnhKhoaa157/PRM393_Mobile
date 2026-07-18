@@ -114,29 +114,32 @@ class _ParkingAppState extends State<ParkingApp> with WidgetsBindingObserver {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)))),
         builder: (context, child) {
           if (child == null) return const SizedBox.shrink();
-          final size = MediaQuery.sizeOf(context);
-          if (size.width > 500) {
-            return Material(
-              color: const Color(0xFFE2E8F0),
-              child: Center(
-                child: Container(
-                  width: 460,
-                  height: size.height,
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 500) {
+                return Material(
+                  color: const Color(0xFFE2E8F0),
+                  child: Center(
+                    child: Container(
+                      width: 460,
+                      height: constraints.maxHeight,
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: child,
+                    ),
                   ),
-                  child: child,
-                ),
-              ),
-            );
-          }
-          return child;
+                );
+              }
+              return child;
+            },
+          );
         },
         home: resetToken != null
             ? ResetPasswordPage(
